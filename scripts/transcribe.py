@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-"""Bim-ASR inference script.
+"""Bim-ASR transcription CLI.
 
-Loads the bim-asr model (PyTorch or MLX backend), reads audio, runs
-the SALM forward pass, and prints the transcript. The script works
-with the unfused base + LoRA weights for now; once we have a fused
-checkpoint this is the entry point.
+Loads the frozen Parakeet encoder, the projection bridge and the
+Qwen3.5 LLM with its LoRA adapter, and prints the transcript.
+
+The implementation is `bim_asr.inference.SalmTranscriber`. This script
+is the argument parsing and the reporting.
 
 Examples
 --------
 
-Transcribe one file with the PyTorch backend (CUDA or CPU):
-
+    # untrained bridge + fresh LoRA (shows the wiring, not a transcript)
     python scripts/transcribe.py path/to/audio.wav
 
-Transcribe with the MLX backend on Apple Silicon:
+    # a Stage 0 trained checkpoint
+    python scripts/transcribe.py path/to/audio.wav \
+        --llm-path artifacts/qwen3.5-2b \
+        --encoder-path artifacts/parakeet-encoder-v2 \
+        --checkpoint artifacts/stage0-ckpt
 
-    python scripts/transcribe.py --backend mlx path/to/audio.wav
+    # several files, with timings
+    python scripts/transcribe.py clips/*.wav --checkpoint artifacts/stage0-ckpt --timing
 """
 
 from __future__ import annotations
@@ -25,141 +30,122 @@ import sys
 import time
 from pathlib import Path
 
-# Make src/ importable when run as a script.
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-import torch  # noqa: E402
+from bim_asr.inference import SalmTranscriber  # noqa: E402
 
-from bim_asr.audio import chunk_waveform, load_audio_16k_mono  # noqa: E402
+DEFAULT_LLM = ROOT / "artifacts" / "qwen3.5-2b"
+DEFAULT_ENCODER = ROOT / "artifacts" / "parakeet-encoder-v2"
+DEFAULT_CHECKPOINT = ROOT / "artifacts" / "stage0-ckpt"
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Bim-ASR transcription")
-    p.add_argument("audio", type=str, help="Path to an audio file (wav/mp3/etc.)")
+    p.add_argument("audio", nargs="+", help="One or more audio files (wav/mp3/m4a/...)")
     p.add_argument(
-        "--backend",
-        choices=["pytorch", "mlx"],
-        default="pytorch",
-        help="Inference backend (default: pytorch)",
+        "--llm-path",
+        default=str(DEFAULT_LLM),
+        help="Local path or Hub id for the LLM (default: artifacts/qwen3.5-2b)",
     )
     p.add_argument(
-        "--encoder-id",
-        default="nvidia/parakeet-tdt-0.6b-v2",
-        help="HF id for the audio encoder",
+        "--encoder-path",
+        default=str(DEFAULT_ENCODER),
+        help="Directory holding the extracted Parakeet encoder",
     )
     p.add_argument(
-        "--llm-id",
-        default="Qwen/Qwen3-4B-Instruct-2507",
-        help="HF id for the language model",
-    )
-    p.add_argument(
-        "--lora-adapter",
+        "--checkpoint",
         default=None,
-        help="Path to a LoRA adapter to load on top of the LLM",
+        help="Trained Stage 0 checkpoint. Without it the bridge is random "
+        "and the output is not a transcript.",
     )
-    p.add_argument(
-        "--window-seconds",
-        type=float,
-        default=30.0,
-        help="Audio window in seconds (default 30)",
-    )
-    p.add_argument(
-        "--overlap-seconds",
-        type=float,
-        default=5.0,
-        help="Overlap between windows in seconds (default 5)",
-    )
-    p.add_argument(
-        "--max-new-tokens",
-        type=int,
-        default=256,
-        help="Maximum number of tokens to generate per window",
-    )
-    p.add_argument(
-        "--quantize-4bit",
-        action="store_true",
-        help="Quantise the LLM to 4-bit (PyTorch backend, requires bitsandbytes)",
-    )
+    p.add_argument("--device", default="cpu", help="cpu or mps")
+    p.add_argument("--dtype", choices=["bfloat16", "float32", "float16"], default="bfloat16")
+    p.add_argument("--window-seconds", type=float, default=30.0)
+    p.add_argument("--overlap-seconds", type=float, default=5.0)
+    p.add_argument("--max-new-tokens", type=int, default=96)
+    p.add_argument("--timing", action="store_true", help="Print RTFx per file")
     return p.parse_args()
-
-
-def transcribe_window(
-    waveform,
-    sample_rate: int,
-    *,
-    backend: str,
-    encoder_id: str,
-    llm_id: str,
-    lora_adapter: str | None,
-    max_new_tokens: int,
-    quantize_4bit: bool,
-) -> str:
-    """Run one inference pass over one audio window.
-
-    This is a stub that prints a clear "not implemented" message. The
-    real implementation wires the FastConformer encoder to the
-    AudioProjection to the Qwen3 LLM with a SALM prompt. It lives in
-    src/bim_asr/inference.py once the encoder is loaded in this
-    environment.
-    """
-    print(
-        "  [stub] encoder=", encoder_id, "llm=", llm_id, "lora=", lora_adapter,
-        "backend=", backend, "quantize_4bit=", quantize_4bit,
-        "max_new_tokens=", max_new_tokens, "samples=", len(waveform),
-        file=sys.stderr,
-    )
-    return ""
 
 
 def main() -> int:
     args = parse_args()
-    audio_path = Path(args.audio)
-    if not audio_path.exists():
-        print(f"audio file not found: {audio_path}", file=sys.stderr)
-        return 2
 
-    print(f"loading audio: {audio_path}", file=sys.stderr)
-    waveform = load_audio_16k_mono(audio_path)
-    sr = 16000
-    print(f"  duration: {len(waveform) / sr:.2f} s", file=sys.stderr)
-
-    chunks = chunk_waveform(
-        waveform,
-        sample_rate=sr,
-        window_seconds=args.window_seconds,
-        overlap_seconds=args.overlap_seconds,
-    )
-    print(f"  windows: {len(chunks)} (each {args.window_seconds}s, overlap {args.overlap_seconds}s)", file=sys.stderr)
-
-    transcripts: list[str] = []
-    t0 = time.time()
-    for i, chunk in enumerate(chunks):
-        text = transcribe_window(
-            chunk,
-            sr,
-            backend=args.backend,
-            encoder_id=args.encoder_id,
-            llm_id=args.llm_id,
-            lora_adapter=args.lora_adapter,
-            max_new_tokens=args.max_new_tokens,
-            quantize_4bit=args.quantize_4bit,
-        )
-        transcripts.append(text)
-        print(f"  window {i + 1}/{len(chunks)} done ({time.time() - t0:.1f}s)", file=sys.stderr)
-    elapsed = time.time() - t0
-    print(f"total wall time: {elapsed:.2f}s ({len(waveform) / sr / max(elapsed, 0.01):.1f}x RTFx)", file=sys.stderr)
-
-    full = " ".join(t for t in transcripts if t).strip()
-    if not full:
+    missing = [
+        path for path in (args.llm_path, args.encoder_path)
+        if not Path(path).exists() and "/" not in str(path)
+    ]
+    if missing:
         print(
-            "WARNING: no transcripts produced. The PyTorch inference path is "
-            "stubbed until the FastConformer encoder is loaded into this "
-            "environment. The real implementation lives in src/bim_asr/inference.py.",
+            "missing artefacts: "
+            + ", ".join(missing)
+            + "\nRun scripts/prepare_parakeet_encoder.py and hf download "
+              "Qwen/Qwen3.5-2B --local-dir artifacts/qwen3.5-2b first.",
             file=sys.stderr,
         )
-        return 0
-    print(full)
+        return 2
+
+    for path in args.audio:
+        if not Path(path).exists():
+            print(f"audio file not found: {path}", file=sys.stderr)
+            return 2
+
+    checkpoint = Path(args.checkpoint) if args.checkpoint else None
+    if checkpoint and not checkpoint.exists():
+        print(f"checkpoint not found: {checkpoint}", file=sys.stderr)
+        return 2
+
+    print(
+        f"loading SALM (llm={args.llm_path}, encoder={args.encoder_path}"
+        f"{', checkpoint=' + str(checkpoint) if checkpoint else ', untrained bridge'})",
+        file=sys.stderr,
+    )
+    import torch
+
+    transcriber = SalmTranscriber(
+        llm_path=args.llm_path,
+        encoder_path=args.encoder_path,
+        checkpoint=checkpoint,
+        device=args.device,
+        dtype=getattr(torch, args.dtype),
+        window_seconds=args.window_seconds,
+        overlap_seconds=args.overlap_seconds,
+        max_new_tokens=args.max_new_tokens,
+    )
+    print("ready", file=sys.stderr)
+
+    if checkpoint is None:
+        print(
+            "NOTE: no --checkpoint given. The projection bridge is randomly "
+            "initialised, so this prints what the base LLM says when handed "
+            "noise. It is not a transcript.",
+            file=sys.stderr,
+        )
+
+    started = time.time()
+    total_audio = 0.0
+    for path in args.audio:
+        result = transcriber.transcribe_file(path)
+        total_audio += result.audio_seconds
+        print(f"\n=== {Path(path).name} ({result.audio_seconds:.2f}s audio) ===")
+        if not result.text:
+            print("(no text generated)")
+            continue
+        print(result.text)
+        if args.timing:
+            print(
+                f"    [{result.chunks} window(s), {result.seconds:.1f}s, "
+                f"RTFx {result.realtime_factor:.2f}x, {args.device}]",
+                file=sys.stderr,
+            )
+
+    if args.timing and len(args.audio) > 1:
+        elapsed = time.time() - started
+        print(
+            f"\n{len(args.audio)} files, {total_audio:.1f}s audio in {elapsed:.1f}s "
+            f"= {total_audio / max(elapsed, 1e-6):.2f}x RTFx",
+            file=sys.stderr,
+        )
     return 0
 
 

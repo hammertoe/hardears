@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtualenvs
+.venv/
+.venv-*/
+
+# Model weights and converted checkpoints (CC-BY-4.0 derived, tens of GB).
+# Recreate with scripts/prepare_parakeet_encoder.py -- see README.
+artifacts/
+
+# Generated speech corpora and cached encoder features.
+# Recreate with scripts/make_smoke_corpus.py.
+data/
+
+# notebooks
+*.ipynb_checkpoints
+# OpenCode session/goal state, not project files
+.opencode/
