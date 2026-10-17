@@ -26,11 +26,22 @@ def test_config_defaults() -> None:
     cfg = BimAsrConfig()
     assert cfg.encoder_id == "nvidia/parakeet-tdt-0.6b-v2"
     assert cfg.llm_id == "Qwen/Qwen3.5-4B"
-    assert cfg.encoder_hidden == 512
+    # Parakeet TDT 0.6B v2 has d_model = 1024 (verified against the
+    # model_config.yaml inside the .nemo and the extracted weights).
+    # The scaffold originally asserted 512 here, which was wrong.
+    assert cfg.encoder_hidden == 1024
     assert cfg.llm_hidden == 2560
     assert cfg.lora_rank == 32
     assert cfg.lora_alpha == 64
     assert cfg.lora_target_modules == ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
+
+
+def test_2b_smoke_config_is_2048_wide() -> None:
+    cfg = BimAsrConfig.for_2b_smoke()
+    assert cfg.llm_id == "Qwen/Qwen3.5-2B"
+    # Qwen3.5-2B is 2048 wide, not 2560 like the 4B.
+    assert cfg.llm_hidden == 2048
+    assert cfg.encoder_hidden == 1024
 
 
 def test_config_immutable() -> None:
@@ -41,16 +52,23 @@ def test_config_immutable() -> None:
 
 def test_projection_shape() -> None:
     proj = AudioProjection()
-    x = torch.randn(2, 100, 512)
+    x = torch.randn(2, 100, 1024)
     y = proj(x)
     assert y.shape == (2, 100, 2560)
 
 
 def test_projection_learnable() -> None:
-    proj = AudioProjection()
+    proj = AudioProjection(512, 2560)
     n = sum(p.numel() for p in proj.parameters() if p.requires_grad)
     assert n > 0
     assert n == 512 * 2560 + 512 + 512  # 512 weight + 512 bias in LayerNorm
+
+
+def test_default_projection_matches_real_encoder_width() -> None:
+    """The default bridge must be sized for the real Parakeet encoder."""
+    proj = AudioProjection()
+    assert proj.proj.in_features == 1024
+    assert proj.proj.out_features == 2560
 
 
 def test_projection_initial_scale() -> None:
