@@ -133,6 +133,7 @@ ENCODER_CFG_MAPPING: dict[str, str] = {
     "dropout_att": "attention_dropout",
     "xscaling": "scale_input",
     "use_bias": "attention_bias",
+    "stochastic_depth_drop_prob": "layerdrop",
 }
 
 FEATURE_KEYS_TO_IGNORE = {
@@ -266,7 +267,8 @@ def build_encoder_config(nemo_config: dict):
     from transformers import ParakeetEncoderConfig
 
     enc = nemo_config["encoder"]
-    # NeMo's default (no stochastic depth) differs from the HF default.
+    # Default to NeMo's no-stochastic-depth, which differs from the HF
+    # default; an explicit value in the checkpoint overrides it below.
     cfg_kwargs: dict = {"layerdrop": float(enc.get("stochastic_depth_drop_prob", 0.0))}
 
     for key, value in enc.items():
