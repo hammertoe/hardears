@@ -236,3 +236,27 @@ def test_bridge_matches_the_frozen_encoder_width() -> None:
     """Default bridge in = real Parakeet d_model."""
     proj = AudioProjection()
     assert proj.proj.in_features == 1024
+
+
+def test_mlx_bridge_defaults_match_the_torch_bridge() -> None:
+    """The MLX mirror duplicates these two numbers on purpose, to stay
+    importable without torch. This test is what stops the duplication
+    from rotting back into the 512 the scaffold shipped."""
+    import inspect
+
+    from bim_asr import mlx_model
+    from bim_asr.model import _FASTCONFORMER_HIDDEN, _QWEN35_4B_HIDDEN
+
+    # The real class is only defined when MLX is importable; when it
+    # is not, the module substitutes a stub that raises. The source is
+    # still checkable either way, so assert on that first.
+    source = inspect.getsource(mlx_model)
+    assert f"encoder_hidden: int = {_FASTCONFORMER_HIDDEN}" in source
+    assert f"llm_hidden: int = {_QWEN35_4B_HIDDEN}" in source
+
+    if not mlx_model.HAS_MLX:
+        pytest.skip("MLX not installed; live signature not available")
+
+    sig = inspect.signature(mlx_model.MlxAudioProjection.__init__)
+    assert sig.parameters["encoder_hidden"].default == _FASTCONFORMER_HIDDEN
+    assert sig.parameters["llm_hidden"].default == _QWEN35_4B_HIDDEN

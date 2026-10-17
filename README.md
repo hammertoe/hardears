@@ -71,17 +71,22 @@ hf download Qwen/Qwen3.5-2B --local-dir artifacts/qwen3.5-2b
 .venv/bin/python scripts/smoke_salm.py --mode real-encoder
 ```
 
-## Three corrections to the design docs
+## Corrections to the design docs
 
-The scaffold's numbers did not match the checkpoints. All three were
-found by reading the actual files rather than trusting the docs, and
-each one is a hard blocker for Stage 1.
+The scaffold's numbers did not match the checkpoints. Each was found by
+reading the actual files rather than trusting the docs, and each is a
+hard blocker for Stage 1. **The docs have now been corrected too** —
+every fix below is marked `[corrected]` in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+[`docs/TRAINING.md`](docs/TRAINING.md), with the evidence.
 
 | Claim in the scaffold | Reality | Evidence |
 | --------------------- | ------- | -------- |
 | encoder hidden = 512 | **1024** (`d_model` in the checkpoint's `model_config.yaml`; v3 is the same width) | `artifacts/parakeet-encoder-v2/bim_asr_encoder.json` |
 | Qwen3.5-2B is 2560 wide, like the 4B | **2048**. The 2B bridge could never splice into the 2B model | `artifacts/qwen3.5-2b/config.json` → `text_config.hidden_size` |
 | load the encoder through `nemo.collections.asr` | NeMo has **no supported macOS build**. The encoder comes from `transformers` instead, using NVIDIA's own NeMo → HF weight mapping | `scripts/prepare_parakeet_encoder.py`, `src/bim_asr/parakeet.py` |
+| Qwen3.5 is 8 linear-attention layers per 1 attention layer | **3:1** (`full_attention_interval = 4`) | `config.json` → `text_config.full_attention_interval` |
+| LoRA covers attention projections only | It also targets the FFN projections; that is what reaches every layer. 23.9M params, not ~27M | `docs/LORA_TARGETS.md` |
 
 Two open questions from the build brief, answered:
 

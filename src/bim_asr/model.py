@@ -202,7 +202,8 @@ class BimAsrModel(nn.Module):
       decode the generated transcript.
     - llm: Qwen3.5-4B with LoRA adapters on the attention and FFN
       projections. Qwen3.5-2B is the smaller variant.
-    - projection: a fresh nn.Linear(512, 2560) bridge.
+    - projection: a fresh nn.Linear(1024, llm_hidden) bridge —
+      2560 for Qwen3.5-4B, 2048 for Qwen3.5-2B.
 
     The forward pass follows the SALM pattern:
 

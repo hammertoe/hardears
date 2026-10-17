@@ -6,6 +6,26 @@ licences because Bim-ASR will be redistributed.
 
 ## Datasets we use
 
+### Stage 0 synthetic corpus (locally generated, not redistributed)
+
+- Source: locally produced. `scripts/make_smoke_corpus.py` renders short
+  English sentences with the offline macOS `say` voices.
+- Contents: 420 distinct sentences, 1,260 train clips (4 voices x 3
+  speed perturbations), 48 eval clips of unseen sentences in two
+  **held-out** voices, plus 48 seen-sentence clips in those same
+  held-out voices. 49 minutes of audio, exact transcripts.
+- Licence: the audio is the output of Apple's system voices. It is
+  generated on demand and **gitignored**; it is not part of any release.
+- Use in Bim-ASR: stage 0 only.
+- Notes: this exists because Stage 0 is a wiring test, and downloading
+  100 hours of LibriSpeech to discover a tensor-shape error is a waste
+  of a day. It is not a training set. It has no noise, no accent
+  variation beyond the voices used, and every sentence is grammatical
+  and short.
+- Reporting rule that came out of it: report `eval` (unseen sentences)
+  and `eval_seen` (unseen voices) side by side. One alone cannot
+  distinguish "cannot hear this voice" from "cannot know this sentence".
+
 ### LibriSpeech (read English, public)
 
 - Source: [openslr/librispeech_asr](https://huggingface.co/datasets/openslr/librispeech_asr)
@@ -62,6 +82,18 @@ licences because Bim-ASR will be redistributed.
   cross-talk) and produce word-level alignment with the NeMo Forced
   Aligner.
 
+## Model weights we touch (not datasets, but the same licence question)
+
+- **`nvidia/parakeet-tdt-0.6b-v2`** — **CC-BY-4.0**. The FastConformer
+  encoder Bim-ASR ships is derived from this checkpoint and carries the
+  same terms. Any release carrying the encoder must reproduce
+  "Parakeet TDT 0.6B v2 -- NVIDIA Corporation, CC-BY-4.0".
+  `scripts/prepare_parakeet_encoder.py` writes that attribution into
+  `bim_asr_encoder.json` next to the weights.
+- **`Qwen/Qwen3.5-2B` / `Qwen/Qwen3.5-4B`** — Apache-2.0. Both Hub repos
+  also contain a vision tower under the same licence; Bim-ASR does not
+  load it.
+
 ## Datasets we deliberately do not use
 
 - **MLS (Multilingual LibriSpeech).** Bigger than LibriSpeech but
@@ -91,6 +123,18 @@ For each training clip we store:
 We also store the SHA-256 of every audio file and every transcript
 line, so we can detect duplicates and re-runs.
 
+**One rule earned the hard way.** Stage 0 wasted a cycle because the
+corpus builder skips a wav that already exists, and clip filenames
+carried no information about the sentence they contained. Re-running
+the builder with a different sentence pool therefore kept the *old*
+audio and wrote the *new* text into the manifest. It surfaced as the
+Parakeet reference ASR scoring 94% WER on one split and 2.1% on
+another, which is not a plausible result for either system. Clip
+filenames now embed a SHA-1 of the sentence, any cached-audio skip is
+keyed on the digest, and `tests/test_corpus.py` fails if two sentences
+could ever share a path. The general rule: **a cache key must include
+everything that determines the cached value.**
+
 ## How we prepare the NeMo manifest
 
 NeMo SALM training expects a JSONL manifest with at least
@@ -110,13 +154,14 @@ Example manifest line:
 
 ## Downloading the data
 
-We use `huggingface-cli` for the public datasets and a manual
-download for GigaSpeech. The download script lives in
-`scripts/download_data.py`.
+We use `hf download` (the current Hugging Face CLI; `huggingface-cli`
+is deprecated) for the public datasets and a manual download for
+GigaSpeech. The download script lives in `scripts/download_data.py`.
 
-- LibriSpeech: `huggingface-cli download openslr/librispeech_asr --repo-type dataset --include "train.clean.100/*"`
-- Common Voice 17: `huggingface-cli download mozilla-foundation/common_voice_17_0 --repo-type dataset --include "en/*"`
-- GigaSpeech: sign in, accept the gate, then `huggingface-cli download speechcolab/gigaspeech --repo-type dataset --include "xs/*"`
+- Model weights: `hf download nvidia/parakeet-tdt-0.6b-v2 parakeet-tdt-0.6b-v2.nemo --local-dir artifacts/parakeet-tdt-0.6b-v2`
+- LibriSpeech: `hf download openslr/librispeech_asr --repo-type dataset --include "train.clean.100/*"`
+- Common Voice 17: `hf download mozilla-foundation/common_voice_17_0 --repo-type dataset --include "en/*"`
+- GigaSpeech: sign in, accept the gate, then `hf download speechcolab/gigaspeech --repo-type dataset --include "xs/*"`
 - Parliament audio: `yt-dlp` against the YouTube and Vimeo URLs.
 
 ## Privacy and consent

@@ -24,9 +24,20 @@ except ImportError:
 if HAS_MLX:
 
     class MlxAudioProjection(mlxnn.Module):
-        """MLX version of the FastConformer -> Qwen3 projection bridge."""
+        """MLX version of the FastConformer -> Qwen3.5 projection bridge.
 
-        def __init__(self, encoder_hidden: int = 512, llm_hidden: int = 2560) -> None:
+        Defaults are 1024 -> 2560: Parakeet TDT 0.6B v2's `d_model` is
+        1024 (the original scaffold said 512, which would not have
+        matched a single real frame), and Qwen3.5-4B is 2560 wide.
+        Qwen3.5-2B is 2048, so pass `llm_hidden` explicitly for it.
+
+        Duplicated rather than imported from `bim_asr.model` on
+        purpose: that module pulls in torch and this one is meant to
+        stay importable in an MLX-only environment.
+        `tests/test_projection.py` asserts the two stay in sync.
+        """
+
+        def __init__(self, encoder_hidden: int = 1024, llm_hidden: int = 2560) -> None:
             super().__init__()
             self.norm = mlxnn.LayerNorm(encoder_hidden)
             self.proj = mlxnn.Linear(encoder_hidden, llm_hidden, bias=False)

@@ -19,3 +19,5 @@ data/
 
 # notebooks
 *.ipynb_checkpoints
+# OpenCode session/goal state, not project files
+.opencode/
