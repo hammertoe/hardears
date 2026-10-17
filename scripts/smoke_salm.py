@@ -73,6 +73,7 @@ from bim_asr.model import (  # noqa: E402
     BimAsrModel,
     build_salm_prompt_ids,
     count_trainable_parameters_summary,
+    stop_token_ids,
 )
 
 DEFAULT_LLM_PATH = ROOT / "artifacts" / "qwen3.5-2b"
@@ -263,6 +264,8 @@ def main() -> int:
     print()
 
     tok = model.tokenizer
+    stop_ids = stop_token_ids(tok)
+    print(f"stop tokens:   {stop_ids}")
 
     # 5. The encoder.
     if args.mode == "real-encoder":
@@ -320,6 +323,7 @@ def main() -> int:
                 inputs_embeds=full,
                 max_new_tokens=args.max_new_tokens,
                 do_sample=False,
+                eos_token_id=stop_ids,
                 pad_token_id=tok.eos_token_id,
             )
             text = tok.decode(out[0], skip_special_tokens=True).strip()
@@ -344,6 +348,7 @@ def main() -> int:
                 inputs_embeds=full2,
                 max_new_tokens=args.max_new_tokens,
                 do_sample=False,
+                eos_token_id=stop_ids,
                 pad_token_id=tok.eos_token_id,
             )
             text2 = tok.decode(out2[0], skip_special_tokens=True).strip()
@@ -377,7 +382,13 @@ def main() -> int:
 
 
 def load_checkpoint(model: BimAsrModel, checkpoint: Path) -> None:
-    """Load a Stage 0 projection + LoRA checkpoint."""
+    """Load a Stage 0 projection + LoRA checkpoint.
+
+    The adapter goes in with `set_peft_model_state_dict`, not
+    `PeftModel.from_pretrained`: the LLM is already a PeftModel with
+    fresh zero-initialised adapters, and re-wrapping would nest two
+    PeftModels.
+    """
     proj_path = checkpoint / "projection.pt"
     if proj_path.exists():
         state = torch.load(proj_path, map_location="cpu", weights_only=True)
@@ -385,11 +396,15 @@ def load_checkpoint(model: BimAsrModel, checkpoint: Path) -> None:
         print(f"  projection weights loaded ({sum(v.numel() for v in state.values()):,} params)")
 
     adapter = checkpoint / "lora_adapter"
-    if adapter.exists():
-        from peft import PeftModel  # noqa: PLC0415
+    weights = adapter / "adapter_model.safetensors"
+    if adapter.exists() and weights.exists():
+        from peft import set_peft_model_state_dict
+        from safetensors.torch import load_file
 
-        model.llm = PeftModel.from_pretrained(model.llm, str(adapter), is_trainable=False)
-        model.llm.to(next(model.projection.parameters()).device)
+        result = set_peft_model_state_dict(model.llm, load_file(str(weights)))
+        unexpected = list(getattr(result, "unexpected_keys", []) or [])
+        if unexpected:
+            raise RuntimeError(f"unexpected LoRA adapter keys: {unexpected[:5]}")
         print(f"  LoRA adapter loaded from {adapter}")
 
 

@@ -34,7 +34,21 @@ smoke_salm.py --mode real-encoder
 | Projection bridge | 2,099,200 params (1024 → 2048), gradients verified through a spliced prompt |
 | End-to-end SALM | audio → encoder → bridge → Qwen3.5-2B + LoRA → text, on CPU or MPS |
 | Audio actually matters | two different clips produce different transcripts |
-| Tests | 50 passing (`pytest tests/`) |
+| Transcription after Stage 0 training | **19.0% WER** on unseen sentences in unseen voices; **0.0%** on seen sentences in unseen voices |
+| Speed | 4.6x real time on MPS, bf16, 1.9B model, one 30 s window |
+| Tests | 56 passing (`pytest tests/`) |
+
+```
+reference : The light faded slowly behind the hills.
+Stage 0   : The lake waited slowly behind the hill.
+
+reference : A woman walked along the quiet shore.
+Stage 0   : A woman walked along the quiet shorn.
+```
+
+The errors are phonetic, which is what a working acoustic path looks
+like. Full numbers, including what this does *not* show, are in
+[`docs/STAGE0_RESULTS.md`](docs/STAGE0_RESULTS.md).
 
 Run the whole thing yourself:
 
@@ -105,6 +119,7 @@ the training plan says.
 - `docs/TRAINING.md` — staged training plan, data, hyperparameters
 - `docs/DATA.md` — dataset sources and licenses
 - `docs/LORA_TARGETS.md` — what the LoRA target list does and does not cover
+- `docs/STAGE0_RESULTS.md` — measured Stage 0 results, and their limits
 - `src/bim_asr/model.py` — config, projection bridge, model, prompt
 - `src/bim_asr/parakeet.py` — the frozen encoder, NeMo-compatible call signature
 - `src/bim_asr/mlx_model.py` — MLX mirror of the projection
@@ -113,8 +128,9 @@ the training plan says.
 - `scripts/make_smoke_corpus.py` — build the Stage 0 speech corpus
 - `scripts/smoke_salm.py` — the Stage 0 gate
 - `scripts/train_stage0.py` — Stage 0 training on the laptop
+- `scripts/transcribe.py` — transcribe a file with the assembled model
 - `scripts/eval_baseline_parakeet.py` — reference ASR, for comparison
-- `tests/` — 50 tests, none of which need the big checkpoints
+- `tests/` — 56 tests, none of which need the big checkpoints
 
 ## Stage 0 training, honestly
 
@@ -125,9 +141,21 @@ size 1, ~26M trainable parameters, frozen encoder features cached
 once.
 
 The corpus is generated locally by `scripts/make_smoke_corpus.py`
-using the offline macOS `say` voice: 260 train + 48 eval clips of
-short, simple English with exact transcripts and no train/eval
-overlap. It exists to test the wiring, not to compete with LibriSpeech.
+using the offline macOS `say` voices: **420 distinct sentences, 1,260
+train clips** (4 voices x 3 speed perturbations), 49 minutes of audio,
+with exact transcripts. It exists to test the wiring, not to compete
+with LibriSpeech.
+
+The evaluation sets vary two things, on purpose:
+
+| set | text | voices | what it measures |
+| --- | ---- | ------ | ----------------- |
+| `eval.jsonl` | 48 unseen sentences | Moira, Tessa -- neither in training | content *and* acoustic generalisation |
+| `eval_seen.jsonl` | 48 sentences from training | Moira, Tessa | acoustic generalisation alone |
+
+Reporting the second one alongside the first is how you tell "it cannot
+cope with words it has not seen" apart from "it cannot cope with a
+voice it has not heard".
 
 An untrained bridge does **not** transcribe. It hands the LLM
 nonsense embeddings, and the LLM responds like a text-only assistant:
@@ -139,8 +167,12 @@ SALM  : 'I am ready to transcribe the audio. Please provide the audio file...'
 
 That is the expected starting point, and the audio-sensitivity check
 in `smoke_salm.py` is what makes it meaningful: the text changes when
-the audio changes, so the audio really is reaching the model. See
-`docs/STAGE0_RESULTS.md` for what training the bridge produces.
+the audio changes, so the audio really is reaching the model. What
+training the bridge produces is in
+[`docs/STAGE0_RESULTS.md`](docs/STAGE0_RESULTS.md), which also records
+two bugs this stage found — a generation loop that never stopped at EOS,
+and a corpus builder that reused stale audio against fresh text. Both
+produced metrics that looked real and were not.
 
 ## Licensing
 

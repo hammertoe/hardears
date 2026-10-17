@@ -400,6 +400,37 @@ class BimAsrModel(nn.Module):
 SALM_SYSTEM_PROMPT = "You are a careful speech transcriber."
 
 
+def stop_token_ids(tokenizer) -> list[int]:
+    """Token ids that should end a generated transcript.
+
+    Qwen3.5-2B on the Hub ships **no generation_config.json**, and its
+    tokenizer reports `eos_token = ''` with `eos_token_id = 248046`
+    (`<|im_end|>`) while `pad_token_id = 248044` (`<|endoftext|>`).
+    Calling `generate()` without an explicit `eos_token_id` therefore
+    never stops: the model emits the correct sentence and then keeps
+    going, which on this task meant every WER was inflated by dozens of
+    points by a single runaway generation.
+
+    Both ids are returned so training and inference agree on where a
+    transcript ends.
+    """
+    ids: set[int] = set()
+    for candidate in (
+        getattr(tokenizer, "eos_token_id", None),
+        getattr(tokenizer, "pad_token_id", None),
+    ):
+        if isinstance(candidate, int):
+            ids.add(candidate)
+    for name in ("<|im_end|>", "<|endoftext|>"):
+        try:
+            token_id = tokenizer.convert_tokens_to_ids(name)
+        except Exception:  # noqa: BLE001 - stub tokenizers in tests
+            continue
+        if isinstance(token_id, int) and token_id >= 0:
+            ids.add(token_id)
+    return sorted(ids)
+
+
 def build_default_prompt_text(
     user_prompt: str,
     audio_locator_tag: str,

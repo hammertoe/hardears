@@ -56,6 +56,7 @@ from bim_asr.model import (  # noqa: E402
     BimAsrConfig,
     BimAsrModel,
     build_salm_prompt_ids,
+    stop_token_ids,
 )
 from bim_asr.parakeet import load_parakeet_encoder  # noqa: E402
 
@@ -97,6 +98,14 @@ def parse_args() -> argparse.Namespace:
         help="Skip training; evaluate a checkpoint (needs --checkpoint)",
     )
     p.add_argument("--checkpoint", type=Path, default=None, help="Checkpoint to evaluate/continue")
+    p.add_argument(
+        "--dump-predictions",
+        type=Path,
+        default=None,
+        help="Write every reference/hypothesis pair to this JSON file. One "
+        "runaway generation moves an average WER by tens of points, so the "
+        "aggregate alone is not readable.",
+    )
     p.add_argument("--eval-limit", type=int, default=24, help="Clips used for eval WER")
     p.add_argument("--greedy", action="store_true", default=True)
     return p.parse_args()
@@ -148,11 +157,20 @@ def build_feature_cache(
 
 
 def tokenize_targets(tokenizer, rows: list[dict]) -> list[list[int]]:
-    eos = tokenizer.eos_token or "<|endoftext|>"
+    """Reference + the token generation must stop on.
+
+    The stop id comes from the tokenizer's own eos_token_id (248046,
+    `<|im_end|>`, the ChatML end-of-turn), because that is what
+    `generate` is told to stop on. Appending `<|endoftext|>` here
+    instead -- which is what the string form resolves to, since the
+    tokenizer reports `eos_token` as an empty string -- trains the model
+    to stop on a different token than inference watches for.
+    """
+    eos_id = tokenizer.eos_token_id
     out = []
     for row in rows:
-        ids = tokenizer(row["text"] + eos, add_special_tokens=False).input_ids
-        out.append(ids)
+        ids = tokenizer(row["text"], add_special_tokens=False).input_ids
+        out.append(ids + [int(eos_id)])
     return out
 
 
@@ -176,28 +194,47 @@ class Stage0Trainer:
 
         self.model = BimAsrModel.from_pretrained(self.cfg, device=args.device)
         self.tokenizer = self.model.tokenizer
+        self.stop_ids = stop_token_ids(self.tokenizer)
         self.trainable = [p for p in self.model.parameters() if p.requires_grad]
         print(f"trainable parameters: {sum(p.numel() for p in self.trainable):,}")
         print(f"frozen parameters:    {sum(p.numel() for p in self.model.parameters()):,}")
+        print(f"stop tokens:          {self.stop_ids}")
         print()
 
     def load_llm_state(self, checkpoint: Path) -> None:
+        """Resume a Stage 0 checkpoint into an already-wrapped model.
+
+        The adapter is loaded with `set_peft_model_state_dict` rather
+        than `PeftModel.from_pretrained`: by this point `self.model.llm`
+        is already a PeftModel carrying fresh zero-initialised LoRA
+        weights, so re-wrapping it would be wrong.
+        """
         proj_path = checkpoint / "projection.pt"
         if proj_path.exists():
             state = torch.load(proj_path, map_location="cpu", weights_only=True)
             self.model.projection.load_state_dict(state)
             print(f"loaded projection from {proj_path}")
-        adapter = checkpoint / "lora_adapter"
-        if adapter.exists():
-            from peft import PeftModel
 
-            self.model.llm = PeftModel.from_pretrained(
-                self.model.llm, str(adapter), is_trainable=True
-            )
+        adapter = checkpoint / "lora_adapter"
+        weights = adapter / "adapter_model.safetensors"
+        if adapter.exists() and weights.exists():
+            from peft import set_peft_model_state_dict
+            from safetensors.torch import load_file
+
+            state = load_file(str(weights))
+            result = set_peft_model_state_dict(self.model.llm, state)
+            unexpected = list(getattr(result, "unexpected_keys", []) or [])
+            if unexpected:
+                raise RuntimeError(
+                    f"unexpected keys in the LoRA adapter: {unexpected[:5]}. "
+                    "The adapter does not match this target-module list."
+                )
             self.model.llm.to(self.device)
             self.trainable = [p for p in self.model.parameters() if p.requires_grad]
-            print(f"loaded LoRA adapter from {adapter} "
-                  f"({sum(p.numel() for p in self.trainable):,} trainable)")
+            print(
+                f"loaded LoRA adapter from {adapter} "
+                f"({sum(p.numel() for p in self.trainable):,} trainable)"
+            )
 
     def make_example(self, features: torch.Tensor, target_ids: list[int],
                      prefix: torch.Tensor, suffix: torch.Tensor) -> dict:
@@ -242,6 +279,7 @@ class Stage0Trainer:
             inputs_embeds=embeds,
             max_new_tokens=max_new_tokens,
             do_sample=False,
+            eos_token_id=self.stop_ids,
             pad_token_id=self.tokenizer.eos_token_id,
         )
         if was_training:
@@ -264,6 +302,8 @@ def main() -> int:
     started = time.time()
 
     trainer = Stage0Trainer(args)
+    if args.dump_predictions:
+        trainer.dump_predictions = args.dump_predictions
     model = trainer.model
     tokenizer = trainer.tokenizer
     prefix, suffix = build_salm_prompt_ids(
@@ -445,12 +485,60 @@ def evaluate(trainer, rows, targets, features, prefix, suffix) -> dict:
         lambda k: getattr(measures, k)
     )
     exact = sum(1 for h, r in zip(hypotheses, references) if h.strip() == r.strip())
+    empty = sum(1 for h in hypotheses if not h.strip())
 
     print()
     for i in range(min(6, len(rows))):
         print(f"  ref: {references[i]}")
         print(f"  hyp: {hypotheses[i]}")
         print()
+
+    dump = getattr(trainer, "dump_predictions", None)
+    if dump is not None:
+        dump.parent.mkdir(parents=True, exist_ok=True)
+        with dump.open("w", encoding="utf-8") as fh:
+            json.dump(
+                {
+                    "clips": len(rows),
+                    "wer": get("wer"),
+                    "mer": get("mer"),
+                    "substitutions": get("substitutions"),
+                    "deletions": get("deletions"),
+                    "insertions": get("insertions"),
+                    "exact_match": exact,
+                    "empty_hypotheses": empty,
+                    "pairs": [
+                        {"ref": r, "hyp": h}
+                        for r, h in zip(references, hypotheses)
+                    ],
+                },
+                fh,
+                indent=2,
+            )
+        print(f"  wrote {len(rows)} prediction pairs -> {dump}")
+
+    # Per-clip WER, so a single runaway generation is visible instead of
+    # hiding inside the average.
+    per_clip = []
+    for r, h in zip(references, hypotheses):
+        if hasattr(jiwer, "process_words"):
+            m = jiwer.process_words([r], [h])
+            value = getattr(m, "wer", None)
+        else:  # pragma: no cover
+            value = jiwer.compute_measures([r], [h])["wer"]
+        per_clip.append(value)
+    worst = sorted(
+        (
+            {"ref": r, "hyp": h, "wer": w}
+            for r, h, w in zip(references, hypotheses, per_clip)
+        ),
+        key=lambda d: -d["wer"],
+    )[:3]
+    if worst and worst[0]["wer"] > 0.5:
+        print("\n  worst clips:")
+        for item in worst:
+            print(f"    [{item['wer'] * 100:.0f}%] {item['ref']}")
+            print(f"            {item['hyp'][:200]}")
 
     if was_training:
         model.train()
@@ -462,6 +550,7 @@ def evaluate(trainer, rows, targets, features, prefix, suffix) -> dict:
         "insertions": get("insertions"),
         "clips": len(rows),
         "exact_match": exact,
+        "empty_hypotheses": empty,
         "examples": [
             {"ref": r, "hyp": h} for r, h in list(zip(references, hypotheses))[:8]
         ],

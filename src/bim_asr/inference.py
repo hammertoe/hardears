@@ -39,7 +39,7 @@ import numpy as np
 import torch
 
 from .audio import chunk_waveform
-from .model import BimAsrConfig, BimAsrModel, build_salm_prompt_ids
+from .model import BimAsrConfig, BimAsrModel, build_salm_prompt_ids, stop_token_ids
 
 SAMPLE_RATE = 16000
 
@@ -88,6 +88,7 @@ class SalmTranscriber:
             self.config, device=device, dtype=dtype
         )
         self.tokenizer = self.model.tokenizer
+        self.stop_ids = stop_token_ids(self.tokenizer)
         if checkpoint:
             self.load_checkpoint(Path(checkpoint))
         self.model.eval()
@@ -109,12 +110,18 @@ class SalmTranscriber:
             self.model.projection.load_state_dict(state)
 
         adapter = checkpoint / "lora_adapter"
-        if adapter.exists():
-            from peft import PeftModel
+        weights = adapter / "adapter_model.safetensors"
+        if adapter.exists() and weights.exists():
+            from peft import set_peft_model_state_dict
+            from safetensors.torch import load_file
 
-            self.model.llm = PeftModel.from_pretrained(
-                self.model.llm, str(adapter), is_trainable=False
-            )
+            # The LLM already carries fresh zero-initialised LoRA
+            # adapters, so the checkpoint is copied into them rather
+            # than wrapped again.
+            result = set_peft_model_state_dict(self.model.llm, load_file(str(weights)))
+            unexpected = list(getattr(result, "unexpected_keys", []) or [])
+            if unexpected:
+                raise RuntimeError(f"unexpected LoRA adapter keys: {unexpected[:5]}")
             self.model.llm.to(self.device)
 
     # -- internals --------------------------------------------------------
@@ -138,6 +145,7 @@ class SalmTranscriber:
             inputs_embeds=embeds,
             max_new_tokens=self.max_new_tokens,
             do_sample=False,
+            eos_token_id=self.stop_ids,
             pad_token_id=self.tokenizer.eos_token_id,
         )
         return self.tokenizer.decode(out[0], skip_special_tokens=True).strip()

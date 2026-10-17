@@ -60,6 +60,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import shutil
@@ -229,8 +230,28 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--leading-silence", type=float, default=0.25)
     p.add_argument("--trailing-silence", type=float, default=0.45)
+    p.add_argument(
+        "--eval-seen",
+        type=int,
+        default=0,
+        help="Also render N training sentences in the held-out eval voices, "
+        "to separate unseen-content errors from unseen-voice errors "
+        "(default 0, off)",
+    )
     p.add_argument("--seed", type=int, default=17)
     return p.parse_args()
+
+
+def _text_tag(text: str) -> str:
+    """Short stable digest of a sentence, used in clip filenames.
+
+    `synthesize` skips a wav that already exists, which is only safe if
+    a given filename can never refer to a different sentence. Without
+    this digest it can: re-running with a different sentence pool keeps
+    the *old* audio and writes the *new* text into the manifest, and
+    every metric downstream is then silently wrong.
+    """
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
 
 
 def synthesize(
@@ -294,6 +315,7 @@ def build_split(
     rate: int,
     lead: float,
     trail: float,
+    suffix: str = ".jsonl",
 ) -> Path:
     audio_dir = out_dir / name / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
@@ -306,7 +328,7 @@ def build_split(
             # is always heard at the same speed.
             voice = voices[(i + v) % len(voices)]
             speed = speeds[(i + v) % len(speeds)]
-            wav_path = audio_dir / f"{name}_{clip:05d}_{voice}_{speed:.1f}.wav"
+            wav_path = audio_dir / f"{name}_{clip:05d}_{_text_tag(sentence)}_{voice}_{speed:.1f}.wav"
             duration = synthesize(
                 sentence, wav_path, voice=voice, rate=rate,
                 lead=lead, trail=trail, speed=speed,
@@ -325,7 +347,7 @@ def build_split(
         if i < 2:
             print(f"  [{name}] {rows[-1]['voice']:9s} @ {rows[-1]['speed']}x  {sentence!r}")
 
-    manifest = out_dir / f"{name}.jsonl"
+    manifest = out_dir / f"{name}{suffix}"
     with manifest.open("w", encoding="utf-8") as fh:
         for row in rows:
             fh.write(json.dumps(row) + "\n")
@@ -333,6 +355,52 @@ def build_split(
     print(f"  [{name}] {len(rows)} clips ({len(sentences)} sentences) "
           f"from {len(voices)} voices, {total / 60:.1f} min audio -> {manifest}")
     return manifest
+
+
+def build_seen_text_eval(
+    out_dir: Path,
+    *,
+    eval_voices: list[str],
+    speeds: list[float],
+    rate: int,
+    lead: float,
+    trail: float,
+    count: int,
+    seed: int,
+) -> Path:
+    """Sentences the model *was* trained on, re-rendered in held-out voices.
+
+    The main eval set varies two things at once: unseen text and unseen
+    voices. If the SALM scores badly there, this set says whether the
+    failure is about content it has never seen or about acoustics it
+    has never heard, which are very different problems with very
+    different fixes.
+
+    It is a weaker claim than the main eval, and is reported alongside
+    it, never instead of it.
+    """
+    train_manifest = out_dir / "train.jsonl"
+    if not train_manifest.exists():
+        raise FileNotFoundError(f"{train_manifest} not found; build the train split first")
+
+    seen: list[str] = []
+    for line in train_manifest.read_text().splitlines():
+        if line.strip():
+            text = json.loads(line)["text"]
+            if text not in seen:
+                seen.append(text)
+    # Sorted, so the sample does not change when the train pool grows:
+    # otherwise the same clip index refers to a different sentence and
+    # the cached audio no longer matches the manifest.
+    rng = random.Random(seed + 1)
+    picked = rng.sample(sorted(seen), min(count, len(seen)))
+    print(f"\nseen-text eval: {len(picked)} training sentences, held-out voices")
+
+    return build_split(
+        "eval_seen", picked, out_dir,
+        voices=eval_voices, speeds=speeds, variants=1,
+        rate=rate, lead=lead, trail=trail, suffix=".jsonl",
+    )
 
 
 def main() -> int:
@@ -383,6 +451,17 @@ def main() -> int:
         voices=eval_voices, speeds=speeds, variants=1,
         rate=args.rate, lead=args.leading_silence, trail=args.trailing_silence,
     )
+    if args.eval_seen:
+        build_seen_text_eval(
+            args.out_dir,
+            eval_voices=eval_voices,
+            speeds=speeds,
+            rate=args.rate,
+            lead=args.leading_silence,
+            trail=args.trailing_silence,
+            count=args.eval_seen,
+            seed=args.seed,
+        )
     print()
     print("OK: corpus ready.")
     return 0
