@@ -28,14 +28,33 @@ The sentences come from two sources:
 Train and eval sentences never overlap: the pool is generated once,
 deduplicated, shuffled with a fixed seed, and then split.
 
-Output is a NeMo-style JSONL manifest (audio_filepath, duration, text)
-plus cached encoder features when requested, so the same files feed
-training and evaluation.
+Voice and speed variation
+-------------------------
+
+Each clip is rendered with a rotating macOS voice and a small speed
+perturbation, which is the cheapest honest augmentation available
+offline:
+
+* **Four training voices** (Alex en_US, Samantha en_US, Daniel en_GB,
+  Karen en_AU) so the bridge cannot memorise one voice.
+* **Two held-out eval voices** (Moira en_IE, Tessa en_ZA). Neither is
+  in training, so the Stage 0 eval number also measures voice
+  generalisation and not just text generalisation.
+* **Three speeds** (0.9x, 1.0x, 1.1x) via ffmpeg `atempo`, the
+  standard speed-perturbation trick.
+
+Sentences rotate voice by index and speed by voice-depth, so the same
+sentence is heard several times with different acoustics and never
+always with the same one.
+
+Output is a NeMo-style JSONL manifest (audio_filepath, duration, text,
+voice, speed) plus cached encoder features when requested, so the same
+files feed training and evaluation.
 
 Usage:
-    python3 scripts/make_smoke_corpus.py                      # 240 train / 48 eval
+    python3 scripts/make_smoke_corpus.py                      # 220 train / 48 eval
     python3 scripts/make_smoke_corpus.py --num-train 400
-    python3 scripts/make_smoke_corpus.py --voice Samantha --rate 165
+    python3 scripts/make_smoke_corpus.py --voices Alex,Samantha
 """
 
 from __future__ import annotations
@@ -180,21 +199,37 @@ def generate_sentences(count: int, rng: random.Random, exclude: set[str]) -> lis
     return out
 
 
+TRAIN_VOICES = ["Alex", "Samantha", "Daniel", "Karen"]
+EVAL_VOICES = ["Moira", "Tessa"]  # never used in training
+SPEEDS = [0.9, 1.0, 1.1]
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build the Stage 0 speech corpus")
     p.add_argument("--out-dir", type=Path, default=ROOT / "data" / "smoke")
-    p.add_argument("--voice", default="Alex", help="macOS voice (default: Alex)")
+    p.add_argument(
+        "--voices",
+        default=",".join(TRAIN_VOICES),
+        help="Comma-separated macOS voices for the train split",
+    )
+    p.add_argument(
+        "--eval-voices",
+        default=",".join(EVAL_VOICES),
+        help="Voices for the eval split. Kept disjoint from training on purpose.",
+    )
+    p.add_argument("--speeds", default=",".join(str(s) for s in SPEEDS))
     p.add_argument("--rate", type=int, default=170, help="words per minute")
-    p.add_argument("--num-train", type=int, default=240)
-    p.add_argument("--num-eval", type=int, default=48)
+    p.add_argument("--num-train", type=int, default=220, help="distinct training sentences")
+    p.add_argument("--num-eval", type=int, default=48, help="distinct eval sentences")
+    p.add_argument(
+        "--train-variants",
+        type=int,
+        default=3,
+        help="Acoustic variants per training sentence (voice and speed rotation)",
+    )
     p.add_argument("--leading-silence", type=float, default=0.25)
     p.add_argument("--trailing-silence", type=float, default=0.45)
     p.add_argument("--seed", type=int, default=17)
-    p.add_argument(
-        "--skip-existing",
-        action="store_true",
-        help="Do not re-render wav files that already exist",
-    )
     return p.parse_args()
 
 
@@ -206,6 +241,7 @@ def synthesize(
     rate: int,
     lead: float,
     trail: float,
+    speed: float = 1.0,
 ) -> float:
     """Render one sentence to a 16 kHz mono wav. Returns duration."""
     if out_path.exists() and out_path.stat().st_size > 44:
@@ -219,13 +255,16 @@ def synthesize(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    atempo = f"atempo={speed}," if abs(speed - 1.0) > 1e-6 else ""
     subprocess.run(
         [
             "ffmpeg", "-y", "-i", str(aiff),
             "-ac", "1", "-ar", str(SAMPLE_RATE),
-            # trim the dead air macOS TTS pads on both ends, then pad
-            # ourselves so the encoder does not start mid-word
+            # speed perturb, then trim the dead air macOS TTS pads on
+            # both ends, then pad ourselves so the encoder does not
+            # start or end mid-word
             "-af",
+            f"{atempo}"
             "silenceremove=start_periods=1:start_silence=0:start_threshold=-45dB,"
             "areverse,"
             "silenceremove=start_periods=1:start_silence=0:start_threshold=-45dB,"
@@ -249,7 +288,9 @@ def build_split(
     sentences: list[str],
     out_dir: Path,
     *,
-    voice: str,
+    voices: list[str],
+    speeds: list[float],
+    variants: int,
     rate: int,
     lead: float,
     trail: float,
@@ -257,27 +298,40 @@ def build_split(
     audio_dir = out_dir / name / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
     rows = []
+    clip = 0
     for i, sentence in enumerate(sentences):
-        wav_path = audio_dir / f"{name}_{i:04d}.wav"
-        duration = synthesize(
-            sentence, wav_path, voice=voice, rate=rate, lead=lead, trail=trail
-        )
-        rows.append(
-            {
-                "audio_filepath": str(wav_path.resolve()),
-                "duration": round(duration, 3),
-                "text": sentence,
-            }
-        )
-        if i < 3 or i == len(sentences) - 1:
-            print(f"  [{name}] {wav_path.name}  {duration:5.2f}s  {sentence}")
+        for v in range(variants):
+            # Rotate voice per sentence, speed per variant depth, so
+            # every sentence is heard by several voices and no sentence
+            # is always heard at the same speed.
+            voice = voices[(i + v) % len(voices)]
+            speed = speeds[(i + v) % len(speeds)]
+            wav_path = audio_dir / f"{name}_{clip:05d}_{voice}_{speed:.1f}.wav"
+            duration = synthesize(
+                sentence, wav_path, voice=voice, rate=rate,
+                lead=lead, trail=trail, speed=speed,
+            )
+            rows.append(
+                {
+                    "audio_filepath": str(wav_path.resolve()),
+                    "duration": round(duration, 3),
+                    "text": sentence,
+                    "voice": voice,
+                    "speed": speed,
+                    "variant": v,
+                }
+            )
+            clip += 1
+        if i < 2:
+            print(f"  [{name}] {rows[-1]['voice']:9s} @ {rows[-1]['speed']}x  {sentence!r}")
 
     manifest = out_dir / f"{name}.jsonl"
     with manifest.open("w", encoding="utf-8") as fh:
         for row in rows:
             fh.write(json.dumps(row) + "\n")
     total = sum(r["duration"] for r in rows)
-    print(f"  [{name}] {len(rows)} clips, {total:.1f}s audio -> {manifest}")
+    print(f"  [{name}] {len(rows)} clips ({len(sentences)} sentences) "
+          f"from {len(voices)} voices, {total / 60:.1f} min audio -> {manifest}")
     return manifest
 
 
@@ -290,14 +344,22 @@ def main() -> int:
         print("ffmpeg not found on PATH.", file=sys.stderr)
         return 1
 
+    voices = [v.strip() for v in args.voices.split(",") if v.strip()]
+    eval_voices = [v.strip() for v in args.eval_voices.split(",") if v.strip()]
+    speeds = [float(s) for s in args.speeds.split(",") if s.strip()]
+    overlap = set(voices) & set(eval_voices)
+    assert not overlap, f"eval voices must be held out from training: {sorted(overlap)}"
+
     rng = random.Random(args.seed)
     train_seed = HANDWRITTEN[:-N_HELD_OUT]
     held_out = HANDWRITTEN[-N_HELD_OUT:]
 
-    print("=" * 64)
+    print("=" * 68)
     print("Stage 0 smoke corpus")
-    print("=" * 64)
-    print(f"voice {args.voice} @ {args.rate} wpm   seed {args.seed}")
+    print("=" * 68)
+    print(f"train voices: {', '.join(voices)}")
+    print(f"eval voices:  {', '.join(eval_voices)}  (held out)")
+    print(f"speeds:       {speeds}   rate {args.rate} wpm   seed {args.seed}")
     print()
 
     eval_sentences = list(held_out)
@@ -312,12 +374,14 @@ def main() -> int:
 
     build_split(
         "train", train_sentences, args.out_dir,
-        voice=args.voice, rate=args.rate, lead=args.leading_silence, trail=args.trailing_silence,
+        voices=voices, speeds=speeds, variants=args.train_variants,
+        rate=args.rate, lead=args.leading_silence, trail=args.trailing_silence,
     )
     print()
     build_split(
         "eval", eval_sentences, args.out_dir,
-        voice=args.voice, rate=args.rate, lead=args.leading_silence, trail=args.trailing_silence,
+        voices=eval_voices, speeds=speeds, variants=1,
+        rate=args.rate, lead=args.leading_silence, trail=args.trailing_silence,
     )
     print()
     print("OK: corpus ready.")
