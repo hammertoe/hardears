@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+*.log
+
+# Secrets — .env holds HF_TOKEN
+.env
+
+# Agent/tooling state
+.opencode/
+
+# Large data trees: regenerate or fetch from the Hub / upstream repos
+hammertoe__barbados-parliament-clips-v1/
+context/
+longform/
+media/
+
+# Model adapters and corpora: large binaries, not source
+# (the adapter itself is published at hammertoe/lfm3-audio-barbados-dapt-pilot)
+artifacts/**/adapter/
+artifacts/**/adapter_final/
+artifacts/**/*.safetensors
+artifacts/**/*.bin
+artifacts/**/*.pt
+artifacts/**/tokenizer.json

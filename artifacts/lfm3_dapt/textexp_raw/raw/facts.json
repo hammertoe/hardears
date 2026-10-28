@@ -1,0 +1,378 @@
+{
+  "qeh-opening-canonical": {
+    "probe": {
+      "id": "qeh-opening-canonical",
+      "fact_id": "qeh-opening",
+      "variant": "canonical",
+      "track": "local",
+      "category": "people_institutions",
+      "prompt": "The Queen Elizabeth Hospital in Barbados opened in",
+      "choices": [
+        "1958",
+        "1966",
+        "1964",
+        "1970"
+      ],
+      "answer_index": 2,
+      "source_digests": [
+        "5b3e27f3c95e84e5a6af8bc82009cda454fc652ae2577e834a497a1b405743d4"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 1,
+    "examples": [
+      "The current hospital building was constructed in 1963\u20131964, and officially opened on 14 November 1964."
+    ]
+  },
+  "first-female-gg-canonical": {
+    "probe": {
+      "id": "first-female-gg-canonical",
+      "fact_id": "first-female-gg",
+      "variant": "canonical",
+      "track": "local",
+      "category": "people_institutions",
+      "prompt": "The first woman to serve as Governor-General of Barbados was",
+      "choices": [
+        "Dame Nita Barrow",
+        "Dame Sandra Mason",
+        "Dame Billie Miller",
+        "Mia Amor Mottley"
+      ],
+      "answer_index": 0,
+      "source_digests": [
+        "165f690badeeee695ceea0f52a23eafe2ceb689d0104c809a8c28f676d729e59"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 3,
+    "examples": [
+      "Visitors to the exhibition will get to gaze upon the wall of \"firsts\" where they will see a photo of the country's first female Governor General, the late Dame Nita Barrow, as well as others, including the first director of Women's Affairs, Marva Alleyne; the first female Chief Immigration Officer, Patricia Cooke;\n\nOne of the batik pieces by Curator and past student, Judy Layne-Banks, on display at The St.",
+      "QUEEN'S Park should be renamed after the first female Governor General of Barbados, Dame Nita Barrow."
+    ]
+  },
+  "first-female-gg-paraphrase": {
+    "probe": {
+      "id": "first-female-gg-paraphrase",
+      "fact_id": "first-female-gg",
+      "variant": "paraphrase",
+      "track": "local",
+      "category": "people_institutions",
+      "prompt": "Who broke the gender barrier in the office of Barbados Governor-General?",
+      "choices": [
+        "Dame Sandra Mason",
+        "Dame Nita Barrow",
+        "Mia Amor Mottley",
+        "Dame Billie Miller"
+      ],
+      "answer_index": 1,
+      "source_digests": [
+        "165f690badeeee695ceea0f52a23eafe2ceb689d0104c809a8c28f676d729e59"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 3,
+    "examples": [
+      "Visitors to the exhibition will get to gaze upon the wall of \"firsts\" where they will see a photo of the country's first female Governor General, the late Dame Nita Barrow, as well as others, including the first director of Women's Affairs, Marva Alleyne; the first female Chief Immigration Officer, Patricia Cooke;\n\nOne of the batik pieces by Curator and past student, Judy Layne-Banks, on display at The St.",
+      "QUEEN'S Park should be renamed after the first female Governor General of Barbados, Dame Nita Barrow."
+    ]
+  },
+  "hurdles-champion-canonical": {
+    "probe": {
+      "id": "hurdles-champion-canonical",
+      "fact_id": "hurdles-champion",
+      "variant": "canonical",
+      "track": "local",
+      "category": "cricket_sport",
+      "prompt": "The Barbadian who won the men's 110 metre hurdles at the 2009 World Championships was",
+      "choices": [
+        "Ryan Brathwaite",
+        "Obadele Thompson",
+        "Shane Brathwaite",
+        "Greggmar Swift"
+      ],
+      "answer_index": 0,
+      "source_digests": [
+        "1a34684950cde88c33c02649706adcd0ce80154d3e929b8f9fa1dac3fa332bff"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 1,
+    "examples": [
+      "In the 2012 edition of the awards, local track star and former 110-Metre Hurdles World Champion, Ryan Brathwaite, took the award over Barbados and West Indies cricketer Kemar Roach in what was deemed a tight race between the two."
+    ]
+  },
+  "hurdles-champion-paraphrase": {
+    "probe": {
+      "id": "hurdles-champion-paraphrase",
+      "fact_id": "hurdles-champion",
+      "variant": "paraphrase",
+      "track": "local",
+      "category": "cricket_sport",
+      "prompt": "Which athlete from Barbados became world champion over 110 metre hurdles in Berlin in 2009?",
+      "choices": [
+        "Shane Brathwaite",
+        "Ryan Brathwaite",
+        "Greggmar Swift",
+        "Obadele Thompson"
+      ],
+      "answer_index": 1,
+      "source_digests": [
+        "1a34684950cde88c33c02649706adcd0ce80154d3e929b8f9fa1dac3fa332bff"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 3,
+    "examples": [
+      "Foster then suggested that not only athletes and other prominent persons should have national songbird Rihanna, world draughts champion Suki King, sprint athlete Obadele Thompson, hurdler Ryan Brathwaite and National Hero, the Right Excellent Errol Walton Barrow, Father of Independence.",
+      "The Club has a strong history of producing world-class hurdlers , with 2009 World Champion Ryan Brathwaite, Commonwealth Games youth record holder Kierre Beckles and Commonwealth gold medalist Rivaldo Leacock among the best known, but coach Babb disclosed that they train athletes in several specialist areas of Athletics."
+    ]
+  },
+  "national-motto-canonical": {
+    "probe": {
+      "id": "national-motto-canonical",
+      "fact_id": "national-motto",
+      "variant": "canonical",
+      "track": "local",
+      "category": "history",
+      "prompt": "The national motto of Barbados is",
+      "choices": [
+        "Pride and Industry",
+        "Each Endeavouring, All Achieving",
+        "Together We Aspire, Together We Achieve",
+        "Out of Many, One People"
+      ],
+      "answer_index": 0,
+      "source_digests": [
+        "f4a4353b2fde938f214cd1da57f879b2cc5964de8e721d6e636e3887a916686f"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 2,
+    "examples": [
+      "McCaskie stressed that Barbados must again embrace its motto ofPride and Industry', in particular towards its work ethic.",
+      "McCaskie stressed that Barbados must again embrace its motto of 'Pride and Industry', in particular towards its work ethic."
+    ]
+  },
+  "crop-over-revival-paraphrase": {
+    "probe": {
+      "id": "crop-over-revival-paraphrase",
+      "fact_id": "crop-over-revival",
+      "variant": "paraphrase",
+      "track": "local",
+      "category": "culture_music",
+      "prompt": "After its earlier decline, in which year was Crop Over re-established as a modern festival?",
+      "choices": [
+        "1980",
+        "1955",
+        "1966",
+        "1974"
+      ],
+      "answer_index": 3,
+      "source_digests": [
+        "0ea760a775ea899f6ad6d0a0809336c2705d8392963e0eb17c6575c30e96e803"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 2,
+    "examples": [
+      "Brathwaite was noted for his studies of Black cultural life both in Africa and throughout the African diasporas of the world in works such as Folk Culture of the Slaves in Jamaica (1970); The Development of Creole Society in Jamaica, 1770\u20131820 (1971); Contradictory Omens (1974); Afternoon of the Status Crow (1982); and History of the Voice (1984), the publication of which established him as the authority of note on nation language.",
+      "Many will want to know whether the festival, which started way back in 1974, is in need of a facelift or even requires some kind of rebranding to make it even more attractive."
+    ]
+  },
+  "parish-count-canonical": {
+    "probe": {
+      "id": "parish-count-canonical",
+      "fact_id": "parish-count",
+      "variant": "canonical",
+      "track": "rare_local",
+      "category": "places_geography",
+      "prompt": "Barbados is divided into this many parishes:",
+      "choices": [
+        "11",
+        "10",
+        "12",
+        "13"
+      ],
+      "answer_index": 0,
+      "source_digests": [
+        "8756fc29156a95983c550c55a67898d16bf09ee003a83a04172a3735990b2847"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 4,
+    "examples": [
+      "Michael is one of 11 parishes in Barbados.",
+      "Philip has the largest land area of the 11 parishes of Barbados and has a relatively flat 'close to sea-level' terrain."
+    ]
+  },
+  "parish-count-paraphrase": {
+    "probe": {
+      "id": "parish-count-paraphrase",
+      "fact_id": "parish-count",
+      "variant": "paraphrase",
+      "track": "rare_local",
+      "category": "places_geography",
+      "prompt": "How many administrative parishes make up Barbados?",
+      "choices": [
+        "12",
+        "11",
+        "13",
+        "10"
+      ],
+      "answer_index": 1,
+      "source_digests": [
+        "8756fc29156a95983c550c55a67898d16bf09ee003a83a04172a3735990b2847"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 3,
+    "examples": [
+      "Michael is one of 11 parishes in Barbados.",
+      "Philip has the largest land area of the 11 parishes of Barbados and has a relatively flat 'close to sea-level' terrain."
+    ]
+  },
+  "grantley-school-canonical": {
+    "probe": {
+      "id": "grantley-school-canonical",
+      "fact_id": "grantley-school",
+      "variant": "canonical",
+      "track": "rare_local",
+      "category": "people_institutions",
+      "prompt": "Sir Grantley Adams received his secondary education at",
+      "choices": [
+        "Combermere School",
+        "The Lodge School",
+        "Harrison College",
+        "Queen's College"
+      ],
+      "answer_index": 2,
+      "source_digests": [
+        "a1439fe783bc76590d6e238982b2762bf65397ff05986b46d1b47a17453ccef5"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 2,
+    "examples": [
+      "Harrison College (Barbados)\n\nHarrison College is a co-educational grammar school (secondary school) in Bridgetown, Barbados.",
+      "He said that a number of students are going after Caribbean Vocational\n\nTouching on the area of tertiary education, he noted that the system is currently under tremendous pressure because of the high cost of university education which has not only increased in Qualifications with schools like Harrison College and Queen's College leading the way ensuring that they have a more diverse profile when they leave secondary school."
+    ]
+  },
+  "grantley-school-paraphrase": {
+    "probe": {
+      "id": "grantley-school-paraphrase",
+      "fact_id": "grantley-school",
+      "variant": "paraphrase",
+      "track": "rare_local",
+      "category": "people_institutions",
+      "prompt": "Which Barbadian secondary school did Grantley Adams attend?",
+      "choices": [
+        "Queen's College",
+        "Combermere School",
+        "The Lodge School",
+        "Harrison College"
+      ],
+      "answer_index": 3,
+      "source_digests": [
+        "a1439fe783bc76590d6e238982b2762bf65397ff05986b46d1b47a17453ccef5"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 8,
+    "examples": [
+      "Harrison College (Barbados)\n\nHarrison College is a co-educational grammar school (secondary school) in Bridgetown, Barbados.",
+      "On Monday, Tull a recent graduate of Harrison College was announced the winner of the school's Film and Photographer class competition which took place last se-\n\n\"The judges were not given the names, ages or any other personal details of any of the students that competed."
+    ]
+  },
+  "uwi-campus-canonical": {
+    "probe": {
+      "id": "uwi-campus-canonical",
+      "fact_id": "uwi-campus",
+      "variant": "canonical",
+      "track": "rare_local",
+      "category": "places_geography",
+      "prompt": "The Barbados campus of The University of the West Indies is at",
+      "choices": [
+        "Cave Hill",
+        "Wildey",
+        "The Garrison",
+        "Codrington"
+      ],
+      "answer_index": 0,
+      "source_digests": [
+        "b10671df8a7a5df1f4686bdb67373d8ea216919d167d31fe6d2d10839ce00480"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 8,
+    "examples": [
+      "Three Ws Oval\n\nThe Three Ws Oval (also commonly nicknamed the 3Ws Oval) is a cricket field at the entrance of the Cave Hill Campus of the University of the West Indies in Barbados.",
+      "The Chairman;The Cave Hill Campus Council, University of the West Indies;        3."
+    ]
+  },
+  "uwi-campus-paraphrase": {
+    "probe": {
+      "id": "uwi-campus-paraphrase",
+      "fact_id": "uwi-campus",
+      "variant": "paraphrase",
+      "track": "rare_local",
+      "category": "places_geography",
+      "prompt": "What is the location name of UWI's campus in Barbados?",
+      "choices": [
+        "Codrington",
+        "Cave Hill",
+        "Wildey",
+        "The Garrison"
+      ],
+      "answer_index": 1,
+      "source_digests": [
+        "b10671df8a7a5df1f4686bdb67373d8ea216919d167d31fe6d2d10839ce00480"
+      ],
+      "stability": "stable",
+      "exposure": "medium"
+    },
+    "n_sentences": 8,
+    "examples": [
+      "Three Ws Oval\n\nThe Three Ws Oval (also commonly nicknamed the 3Ws Oval) is a cricket field at the entrance of the Cave Hill Campus of the University of the West Indies in Barbados.",
+      "In 1999 Ifill became the first blind person to graduate from the University of the West Indies, gaining a degree in Sociology and Psychology from Cave Hill Campus in her native Barbados."
+    ]
+  },
+  "sjpp-expansion-paraphrase": {
+    "probe": {
+      "id": "sjpp-expansion-paraphrase",
+      "fact_id": "sjpp-expansion",
+      "variant": "paraphrase",
+      "track": "rare_local",
+      "category": "people_institutions",
+      "prompt": "What was the full name of the Barbadian institution abbreviated SJPP?",
+      "choices": [
+        "Sir John Prescod Programme",
+        "Samuel Jordan Professional Project",
+        "St. James Parish Polytechnic",
+        "Samuel Jackman Prescod Polytechnic"
+      ],
+      "answer_index": 3,
+      "source_digests": [
+        "73aa3e8ba36d8cd14a3771b96bf0d9db33566f061d47fa339fd82a9410ffeb01"
+      ],
+      "stability": "stable",
+      "exposure": "rare"
+    },
+    "n_sentences": 3,
+    "examples": [
+      "The Youth Mainstreaming Programme partners with recognised educational institutions to facilitate the training and development needs of Barbadian youth including Samuel Jackman Prescod Polytechnic, Barbados Community College - Hospitality Institute and Barbados Vocational Training Board.",
+      "In 1829, at a meeting of the free coloured, he reported rebuked the leaders of his class for not Today, most remember him through the existing vocational training and tertiary institution, Samuel Jackman Prescod Polytechnic (renamed the Samuel Jackman Prescod Institute of Technology) and his face is on the Barbadian $20 bill."
+    ]
+  }
+}

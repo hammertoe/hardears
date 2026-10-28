@@ -1,0 +1,54 @@
+{
+  "base_knowledge": {
+    "correct": 24,
+    "total": 60,
+    "acc": 0.4,
+    "by_track": {
+      "local": {
+        "n": 20,
+        "acc": 0.3
+      },
+      "rare_local": {
+        "n": 20,
+        "acc": 0.15
+      },
+      "control": {
+        "n": 20,
+        "acc": 0.75
+      }
+    }
+  },
+  "post_knowledge": {
+    "correct": 21,
+    "total": 60,
+    "acc": 0.35,
+    "by_track": {
+      "local": {
+        "n": 20,
+        "acc": 0.15
+      },
+      "rare_local": {
+        "n": 20,
+        "acc": 0.1
+      },
+      "control": {
+        "n": 20,
+        "acc": 0.8
+      }
+    }
+  },
+  "base_asr": {
+    "itinerary_29s.wav": "So you're planning a trip to Barbados and you have no idea what to do? Well, here's everything I recommend. First, you're going to wake up early at least one of the days so you can see the racehorses bathing at Pebble Beach. Second, if you're a morning person, a sunrise on the east side of the island is an absolute must-see. Third, you're going to charter a yacht with Seadus Barbados to put the most relaxing day on the ocean. It's such a vibe. Fourth, you're going to check out St. Nicholas Abbey and Steam Railway. Since Barbados is the birthplace of rum, this is a must-add for your itinerary. Fifth, you're going to visit Hayman's",
+    "itinerary_29s_b.wav": "It's the largest outdoor market in Barbados and there are so many local vendors to shop from. Sixth and possibly the most unique experience, it's Dine with a Bajan where you literally get to go into a local home and experience dinner with them. Our hearts and bellies were so full. Fridays at Oistins is basically where the entire island goes for the best fish fry and the biggest party. It's such a fun time. And last but certainly not least, you have to go say hi to Riri in Barbados, whether it's her childhood home or seeing her beachfront home. It's a must do. Barbados is so full of so",
+    "things25_29s.wav": "Well, here are 25 things to do in Barbados, your next weekend getaway destination. Comment the word hotel below and I'll share exclusive discounts for select hotels in Barbados. Save and share this video with your friends for later. Day 1. Start your trip on the south coast at Wooding Square, a vibrant open-air food garden with tons of local eats. Grab lunch or a snack from Chefette, then take a breezy walk along the Richard Heens Boardwalk. In the evening, head to"
+  },
+  "post_asr": {
+    "itinerary_29s.wav": "So you're planning a trip to Barbados and you have no idea what to do? Well, here's everything I recommend. First, you're going to wake up early at least one of the days so you can see the racehorses bathing at Pebble Beach. Second, if you're a morning person, a sunrise on the east side of the island is an absolute must-see. Third, you're going to charter a yacht with Seadus Barbados to put the most relaxing day on the ocean. It's such a vibe. Fourth, you're going to check out St. Nicholas Abbey and Steam Railway. Since Barbados is the birthplace of rum, this is a must-add for your itinerary. Fifth, you're going to visit Hayman's",
+    "itinerary_29s_b.wav": "It's the largest outdoor market in Barbados and there are so many local vendors to shop from. Sixth and possibly the most unique experience, it's Dine with a Bajan where you literally get to go into a local home and experience dinner with them. Our hearts and bellies were so full. Fridays at Oistins is basically where the entire island goes for the best fish fry and the biggest party. It's such a fun time. And last but certainly not least, you have to go say hi to Riri in Barbados, whether it's her childhood home or seeing her beachfront home. It's a must do. Barbados is so full of so",
+    "things25_29s.wav": "Well, here are 25 things to do in Barbados, your next weekend getaway destination. Comment the word hotel below and I'll share exclusive discounts for select hotels in Barbados. Save and share this video with your friends for later. Day 1. Start your trip on the south coast at Wooding Square, a vibrant open-air food garden with tons of local eats. Grab lunch or a snack from Chefette, then take a breezy walk along the Richard Heens Boardwalk. In the evening, head to"
+  },
+  "adapter_applied_logit_diff": 13.59375,
+  "audio_encoder_maxdiff": 0.0,
+  "train_stats_file": "/tmp/scratchpad/pilot_out/train_stats.json",
+  "elapsed_min": 5.7
+}
